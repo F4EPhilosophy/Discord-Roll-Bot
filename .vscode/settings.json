@@ -1,0 +1,10 @@
+{
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "driver": "SQLite",
+            "name": "extra rolls",
+            "database": "${workspaceFolder:rollBot}/extraRolls.sql"
+        }
+    ]
+}

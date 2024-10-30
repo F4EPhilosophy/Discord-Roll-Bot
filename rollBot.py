@@ -2,12 +2,28 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import random
+import sqlite3
 
 # Enable Intents
 intents = discord.Intents.default()
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="/", intents=intents)
+try:
+    sqliteConnection = sqlite3.connect('extraRolls.sql')
+    cursor = sqliteConnection.cursor()
+    print('Connected to the database')
+    cursor.execute("""CREATE TABLE IF NOT EXISTS user (
+                    name TEXT,
+                    rolls INTEGER
+                   )""")
+ 
+    sqliteConnection.commit()
+    sqliteConnection.close()
+    
+
+except:
+    print('Failed to connect to the database')
 
 bot.rollWindow = False
 bot.rollWindowResults = []
