@@ -74,7 +74,7 @@ async def roll(interaction: discord.Interaction):
             await interaction.followup.send(f"{interaction.user.mention} you have already rolled twice, your {number} will be ignored.")
             #No workie and idk why
             #"Command 'roll' raised an exception: TypeError: object method can't be used in 'await' expression"
-            await interaction.delete_original_response
+            await interaction.delete_original_response()
 
 # Run the bot
 bot.run('MTI5ODgzNTIzMDYyMjIyMDI5OQ.G8jnzr.ErBLvOEmw-igeMl6Z46BMNZroU6IDQZ7fqdz_g')
