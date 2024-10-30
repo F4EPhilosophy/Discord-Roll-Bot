@@ -51,8 +51,6 @@ async def rollwindowopen(interaction: discord.Interaction, item: str):
         userRollCount = {}
         await interaction.response.send_message(f"@everyone You may begin rolling for: `{item}`")
 
-# Need to track who has extra rolls to use
-# Need to add command to give and take extra rolls
 # currently everyone can roll twice but thats not ideal
 @bot.tree.command(name="rollwindowclose", description="Stop all rolling.")
 async def rollwindowclose(interaction: discord.Interaction):
@@ -86,8 +84,6 @@ async def roll(interaction: discord.Interaction):
             bot.rollWindowResults.append((interaction.user.name, number))
         else:   
             await interaction.followup.send(f"{interaction.user.mention} you have already rolled twice, your {number} will be ignored.")
-            #No workie and idk why
-            #"Command 'roll' raised an exception: TypeError: object method can't be used in 'await' expression"
             await interaction.delete_original_response()
 
 @bot.tree.command(name="addextraroll", description="Gives a user an extra roll to use later")
