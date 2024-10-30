@@ -1,2 +1,2 @@
-DELETE from user
-WHERE name = "User1";
+ALTER TABLE extraRolls
+ADD COLUMN ID INTEGER
