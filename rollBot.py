@@ -72,19 +72,31 @@ async def roll(interaction: discord.Interaction):
         return
 
     number = random.randint(1, 100)
-
     await interaction.response.send_message(f"🎲 You rolled a {number}! 🎲")
+
     if bot.rollWindow == True:
-        user = interaction.user.name
+        user = interaction.user.id
+        sqliteConnection = sqlite3.connect('extraRolls.sql')
+        cursor = sqliteConnection.cursor()
+        cursor.execute("SELECT rolls FROM user WHERE id = ?", (interaction.user.id,))
+        userData = cursor.fetchone()
+
         if user not in userRollCount:
             userRollCount[user] = 1
             bot.rollWindowResults.append((interaction.user.name, number))
-        elif userRollCount[user] < 2:
+        elif userRollCount[user] < 2 and userData[0] >= 1:
             userRollCount[user] += 1
+            cursor.execute("UPDATE user SET rolls = rolls - 1 WHERE id = ?", (interaction.user.id,))
             bot.rollWindowResults.append((interaction.user.name, number))
+        elif userData[0] == 0:
+            await interaction.followup.send(f"{interaction.user.mention} you have no extra rolls avalible")
+            await interaction.delete_original_response()
         else:   
             await interaction.followup.send(f"{interaction.user.mention} you have already rolled twice, your {number} will be ignored.")
             await interaction.delete_original_response()
+
+        sqliteConnection.commit()
+        sqliteConnection.close()
 
 @bot.tree.command(name="addextraroll", description="Gives a user an extra roll to use later")
 async def addextraroll(interaction: discord.Interaction, member: discord.Member):
@@ -112,33 +124,28 @@ async def addextraroll(interaction: discord.Interaction, member: discord.Member)
             sqliteConnection.commit()
             sqliteConnection.close()
 
-@bot.tree.command(name="removeextraroll", description="Gives a user an extra roll to use later")
+@bot.tree.command(name="removeextraroll", description="Removes an extra roll from a user if they have one")
 async def removeextraroll(interaction: discord.Interaction, member: discord.Member):
     if interaction.channel.id != rollChannelID:
-        await interaction.response.send_message("You cannot use that command in this channel")
+        await interaction.response.send_message("You cannot use that command in this channel.")
     elif not any(role.id == roleID for role in interaction.user.roles):
-        await interaction.response.send_message(f"{interaction.user.mention} you do not have permission to use this command")
+        await interaction.response.send_message(f"{interaction.user.mention} you do not have permission to use this command.")
     else:   
-        userID = member.id
-
         sqliteConnection = sqlite3.connect('extraRolls.sql')
         cursor = sqliteConnection.cursor()
-        
-        #I dont care about the ID, I care what row it came from. Unsure how to move forward with this command quite yet.
-        cursor.execute("""SELECT * FROM user WHERE id = ?""", (userID,))
-        exists = cursor.fetchone()
-        cursor.execute("""SELECT EXISTS(Select 1 FROM user WHERE id = ?""", (userID,))
-        rollCount = cursor.fetchone()
 
-        if not exists:
+        cursor.execute("SELECT rolls FROM user WHERE id = ?", (member.id,))
+        userData = cursor.fetchone()
+
+        if not userData:
             await interaction.response.send_message(f"{member.name} does not exist in the database.")
-        elif exists[1] == 0:
-            await interaction.response.send_message(f"{member.name} has no extra rolls")
-        else:   
-            cursor.execute("""UPDATE user SET rolls = rolls - 1 WHERE ID = ?""", (userID,))
+        elif userData[0] == 0:
+            await interaction.response.send_message(f"{member.name} has no extra rolls.")
+        else:
+            cursor.execute("UPDATE user SET rolls = rolls - 1 WHERE id = ?", (member.id,))
             await interaction.response.send_message(f"{member.name} has had an extra roll taken away.")
             sqliteConnection.commit()
-            sqliteConnection.close()
+        sqliteConnection.close()
 
 # Run the bot
 bot.run('MTI5ODgzNTIzMDYyMjIyMDI5OQ.G8jnzr.ErBLvOEmw-igeMl6Z46BMNZroU6IDQZ7fqdz_g')
