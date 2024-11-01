@@ -30,6 +30,8 @@ userRollCount = {}
 rollChannelID = 1298885178562711624; # To prevent rolling in other channels.
 roleID = 1300336466660167710 # Limit who can start/stop rolling sessions
 
+#Add logic to backup the database every 24 hours
+#Add extra roll lookup command
 
 @bot.event
 async def on_ready():
@@ -84,13 +86,14 @@ async def roll(interaction: discord.Interaction):
         if user not in userRollCount:
             userRollCount[user] = 1
             bot.rollWindowResults.append((interaction.user.name, number))
+        elif userData == None or userData[0] == 0:
+            await interaction.followup.send(f"{interaction.user.mention} you have no extra rolls avalible")
+            await interaction.delete_original_response()
         elif userRollCount[user] < 2 and userData[0] >= 1:
             userRollCount[user] += 1
             cursor.execute("UPDATE user SET rolls = rolls - 1 WHERE id = ?", (interaction.user.id,))
             bot.rollWindowResults.append((interaction.user.name, number))
-        elif userData[0] == 0:
-            await interaction.followup.send(f"{interaction.user.mention} you have no extra rolls avalible")
-            await interaction.delete_original_response()
+        
         else:   
             await interaction.followup.send(f"{interaction.user.mention} you have already rolled twice, your {number} will be ignored.")
             await interaction.delete_original_response()
@@ -98,8 +101,8 @@ async def roll(interaction: discord.Interaction):
         sqliteConnection.commit()
         sqliteConnection.close()
 
-@bot.tree.command(name="addextraroll", description="Gives a user an extra roll to use later")
-async def addextraroll(interaction: discord.Interaction, member: discord.Member):
+@bot.tree.command(name="addroll", description="Gives a user an extra roll to use later")
+async def addroll(interaction: discord.Interaction, member: discord.Member):
     if interaction.channel.id != rollChannelID:
         await interaction.response.send_message("You cannot use that command in this channel")
     elif not any(role.id == roleID for role in interaction.user.roles):
@@ -124,8 +127,8 @@ async def addextraroll(interaction: discord.Interaction, member: discord.Member)
             sqliteConnection.commit()
             sqliteConnection.close()
 
-@bot.tree.command(name="removeextraroll", description="Removes an extra roll from a user if they have one")
-async def removeextraroll(interaction: discord.Interaction, member: discord.Member):
+@bot.tree.command(name="removeroll", description="Removes an extra roll from a user if they have one")
+async def removeroll(interaction: discord.Interaction, member: discord.Member):
     if interaction.channel.id != rollChannelID:
         await interaction.response.send_message("You cannot use that command in this channel.")
     elif not any(role.id == roleID for role in interaction.user.roles):
@@ -147,5 +150,52 @@ async def removeextraroll(interaction: discord.Interaction, member: discord.Memb
             sqliteConnection.commit()
         sqliteConnection.close()
 
+@bot.tree.command(name="extrarolls", description="Removes an extra roll from a user if they have one")
+async def extrarolls(interaction: discord.Interaction):
+    if interaction.channel.id != rollChannelID:
+        await interaction.response.send_message("You cannot use that command in this channel.")
+    else:
+        sqliteConnection = sqlite3.connect('extraRolls.sql')
+        cursor = sqliteConnection.cursor()
+        cursor.execute("SELECT rolls FROM user WHERE id = ?", (interaction.user.id,))
+        userData = cursor.fetchone()
+        await interaction.response.send_message(f"You have {userData[0]} extra roll(s)")
+
+
+@bot.tree.command(name="extrarollsearch", description="Removes an extra roll from a user if they have one")
+async def extrarollsearch(interaction: discord.Interaction, member: discord.Member):
+    if interaction.channel.id != rollChannelID:
+        await interaction.response.send_message("You cannot use that command in this channel.")
+    else:
+        sqliteConnection = sqlite3.connect('extraRolls.sql')
+        cursor = sqliteConnection.cursor()
+        cursor.execute("SELECT rolls FROM user WHERE id = ?", (member.id,))
+        userData = cursor.fetchone()
+        await interaction.response.send_message(f"{member.name} has {userData[0]} extra roll(s)")
+
+@bot.tree.command(name="extrarolltable", description="Removes an extra roll from a user if they have one")
+async def extrarolltable(interaction: discord.Interaction, rows: int):
+    if interaction.channel.id != rollChannelID:
+        await interaction.response.send_message("You cannot use that command in this channel.")
+    else:
+        sqliteConnection = sqlite3.connect('extraRolls.sql')
+        cursor = sqliteConnection.cursor()
+
+        cursor.execute("SELECT COUNT(*) FROM user")
+        totalRows = cursor.fetchone()[0]
+        if rows > totalRows:
+            rows = totalRows
+        
+        cursor.execute("SELECT name, rolls FROM user LIMIT ?", (rows,))
+        rows = cursor.fetchall()
+
+        if rows:
+            response = "\n".join([f"`Name: {row[0]}, Extra rolls: {row[1]}`" for row in rows])
+        else:
+            response = "No data found."
+        await interaction.response.send_message(f"{response}")
+
+    sqliteConnection.close()
+
 # Run the bot
-bot.run('MTI5ODgzNTIzMDYyMjIyMDI5OQ.G8jnzr.ErBLvOEmw-igeMl6Z46BMNZroU6IDQZ7fqdz_g')
+bot.run('MTMwMTc5OTY4MzQ1ODMzODgxNg.G00_c8.2cy6UNxOJdMDL-Ec9TJtLplYhPubXYZyYFH7VQ')
