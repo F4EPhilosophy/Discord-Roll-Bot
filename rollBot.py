@@ -31,7 +31,6 @@ rollChannelID = 1298885178562711624; # To prevent rolling in other channels.
 roleID = 1300336466660167710 # Limit who can start/stop rolling sessions
 
 #Add logic to backup the database every 24 hours
-#Add extra roll lookup command
 
 @bot.event
 async def on_ready():
@@ -51,9 +50,8 @@ async def rollwindowopen(interaction: discord.Interaction, item: str):
         bot.rollWindow = True
         bot.rollWindowResults = []
         userRollCount = {}
-        await interaction.response.send_message(f"@everyone You may begin rolling for: `{item}`")
+        await interaction.response.send_message(f"@here You may begin rolling for: `{item}`")
 
-# currently everyone can roll twice but thats not ideal
 @bot.tree.command(name="rollwindowclose", description="Stop all rolling.")
 async def rollwindowclose(interaction: discord.Interaction):
     if interaction.channel.id != rollChannelID:
