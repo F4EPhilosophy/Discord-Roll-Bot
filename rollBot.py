@@ -188,9 +188,9 @@ async def extrarolltable(interaction: discord.Interaction, rows: int):
         
         cursor.execute("SELECT name, rolls FROM user LIMIT ?", (rows,))
         rows = cursor.fetchall()
-
         if rows:
-            response = "\n".join([f"`Name: {row[0]}, Extra rolls: {row[1]}`" for row in rows])
+            sortedTable = sorted(rows, key=lambda x: x[1], reverse=True)
+            response = "\n".join([f"`Name: {row[0]}, Extra rolls: {row[1]}`" for row in sortedTable])
         else:
             response = "No data found."
         await interaction.response.send_message(f"{response}")
