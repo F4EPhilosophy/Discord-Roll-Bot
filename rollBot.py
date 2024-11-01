@@ -198,4 +198,7 @@ async def extrarolltable(interaction: discord.Interaction, rows: int):
     sqliteConnection.close()
 
 # Run the bot
-bot.run('MTMwMTc5OTY4MzQ1ODMzODgxNg.G00_c8.2cy6UNxOJdMDL-Ec9TJtLplYhPubXYZyYFH7VQ')
+
+with open("API-Key.txt", "r", encoding='utf-8-sig') as f:
+    apiKey = f.read()
+bot.run(apiKey)
