@@ -203,9 +203,9 @@ async def setrollchannel(interaction: discord.Interaction):
     rollChannelID = interaction.channel.id
 
 @bot.tree.command(name="setrollrole", description="Sets role for permissions to open/close roll windows.")
-async def setrollrole(interaction: discord.Interaction, id: int):
+async def setrollrole(interaction: discord.Interaction, id: str):
     global roleID
-    roleID = id
+    roleID = int(id)
 
 # Run the bot.
 
