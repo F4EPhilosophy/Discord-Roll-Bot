@@ -1,7 +1,6 @@
 import discord
 from discord.ext import commands
 import random
-from discord import app_commands
 
 def findUser(id):
     global users
@@ -31,7 +30,7 @@ def saveUserFile():
         f.close()
 
 def readUserFile():
-    global users 
+    global users
     users = []
     try:
         with open("extraRolls.txt", "r", encoding='utf-8-sig') as f:
@@ -48,19 +47,21 @@ class User:
     nickName = ""
     discordName = ""
     extraRolls = 0
+    dkp = 0
 
-    def __init__(self, id, nickName, discordName, extraRolls):
-        self.updateUser(id, nickName, discordName, extraRolls)
+    def __init__(self, id, nickName, discordName, extraRolls, dkp,):
+        self.updateUser(id, nickName, discordName, extraRolls, dkp)
 
     def formatForFile(self):
-        string = str(self.id) + "," + self.nickName + "," + self.discordName + "," + str(self.extraRolls) + "\n"
+        string = str(self.id) + "," + self.nickName + "," + self.discordName + "," + str(self.extraRolls) + "," + str(self.dkp) + "\n"
         return string
     
-    def updateUser(self, id, nickName, discordName, extraRolls):
+    def updateUser(self, id, nickName, discordName, extraRolls, dkp):
         self.id = id
         self.nickName = nickName if nickName != None else discordName
         self.discordName = discordName
         self.extraRolls = extraRolls
+        self.dkp = dkp
 
 
 # Enable Intents
@@ -104,6 +105,8 @@ async def rollwindowclose(interaction: discord.Interaction):
     
     if bot.rollWindow == False:
         await interaction.response.send_message("Rolling is already closed")
+    elif not bot.rollWindowResults:   
+        await interaction.response.send_message("Roll window closed - No rolls logged")
     else:   
         bot.rollWindow = False
         sortedResult = sorted(bot.rollWindowResults, key=lambda x: x[1], reverse=True)
@@ -159,6 +162,7 @@ async def addroll(interaction: discord.Interaction, member: discord.Member):
 
 @bot.tree.command(name="removeroll", description="Removes an extra roll from a user if they have one")
 async def removeroll(interaction: discord.Interaction, member: discord.Member):
+    global users
     if not await validChannel(interaction) or not await validRole(interaction):
         return
     user = findUser(member.id)   
@@ -168,6 +172,36 @@ async def removeroll(interaction: discord.Interaction, member: discord.Member):
     else:
         await interaction.response.send_message(f"{member.name} has had an extra roll taken away.")
         user.extraRolls -= 1
+    saveUserFile()
+
+@bot.tree.command(name="adddkp", description="Gives a user an extra roll to use later")
+async def dkpadd(interaction: discord.Interaction, member: discord.Member, ammount: int):
+    global users
+    if not await validChannel(interaction) or not await validRole(interaction):
+        return
+    
+    user = findUser(member.id)
+    if user == None:
+        user = User(member.id, member.nick, member.name, 0, 0)
+        users.append(user)
+    else:
+        await interaction.response.send_message(f"{member.name} has had {ammount} DKP added.")
+        user.dkp += ammount
+    saveUserFile()
+
+@bot.tree.command(name="removedkp", description="Gives a user an extra roll to use later")
+async def dkpremove(interaction: discord.Interaction, member: discord.Member, ammount: int):
+
+    if not await validChannel(interaction) or not await validRole(interaction):
+        return
+    
+    user = findUser(member.id)
+    if user == None:
+        user = User(member.id, member.nick, member.name, 0, 0)
+        users.append(user)
+    else:
+        await interaction.response.send_message(f"{member.name} has had {ammount} DKP removed.")
+        user.dkp -= ammount
     saveUserFile()
 
 @bot.tree.command(name="extrarolls", description="How many extra rolls you have.")
@@ -197,10 +231,13 @@ async def extrarolltable(interaction: discord.Interaction, rows: int):
         response = "\n".join([f"`Name: {user.nickName}, Extra rolls: {user.extraRolls}`" for user in sortedUsers[0:rows]])
     await interaction.response.send_message(f"{response}")
 
-@bot.tree.command(name="setrollchannel", description="Designates role channel to channel command is used in.")
-async def setrollchannel(interaction: discord.Interaction):
+@bot.tree.command(name="setchannel", description="Designates a channel to use all commands in.")
+async def setchannel(interaction: discord.Interaction):
+    if not await validRole(interaction):
+        return
     global rollChannelID
     rollChannelID = interaction.channel.id
+<<<<<<< Updated upstream
 
 @bot.tree.command(name="setrollrole", description="Sets role for permissions to open/close roll windows.")
 async def setrollrole(interaction: discord.Interaction, id: int):
@@ -208,6 +245,29 @@ async def setrollrole(interaction: discord.Interaction, id: int):
     roleID = id
 
 # Run the bot
+=======
+    await interaction.response.send_message("Channel Set")
+    
+@bot.tree.command(name="setrole", description="Set the role allowed to use open/close window + add/remove extra rolls.")
+@commands.has_permissions(administrator=True)
+async def setrole(interaction: discord.Interaction, id: str):
+    global roleID
+    roleID = int(id)
+    await interaction.response.send_message("Role Set")
+
+@bot.tree.command(name="createlisting", description="Creates a thread for item listing.")
+async def createlisting(interaction: discord.Interaction, item: str, trait: str):
+    if not await validChannel(interaction) or not await validRole(interaction):
+        return
+    
+    starter_message = await interaction.channel.send(f"Listing for **{item}** with **{trait}** has been created.")
+    thread = await starter_message.create_thread(
+    name = f"{item} - {trait}",
+    auto_archive_duration = 1440
+    )
+    
+# Run the bot.
+>>>>>>> Stashed changes
 
 with open("API-Key.txt", "r", encoding='utf-8-sig') as f:
     apiKey = f.read()

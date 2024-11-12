@@ -7,4 +7,5 @@
             "database": "${workspaceFolder:rollBot}/extraRolls.sql"
         }
     ]
+    "editor.ruler": 80
 }
