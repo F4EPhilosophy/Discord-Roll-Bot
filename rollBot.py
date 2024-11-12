@@ -36,7 +36,7 @@ def readUserFile():
         with open("extraRolls.txt", "r", encoding='utf-8-sig') as f:
             for line in f:
                 vals = line.split(',')
-                users.append(User(int(vals[0]), vals[1], vals[2], int(vals[3])))
+                users.append(User(int(vals[0]), vals[1], vals[2], int(vals[3]), int(vals[4])))
             f.close()
     except:
         with open("extraRolls.txt", "w", encoding='utf-8-sig') as f:
@@ -49,7 +49,7 @@ class User:
     extraRolls = 0
     dkp = 0
 
-    def __init__(self, id, nickName, discordName, extraRolls, dkp,):
+    def __init__(self, id, nickName, discordName, extraRolls, dkp):
         self.updateUser(id, nickName, discordName, extraRolls, dkp)
 
     def formatForFile(self):
@@ -237,15 +237,6 @@ async def setchannel(interaction: discord.Interaction):
         return
     global rollChannelID
     rollChannelID = interaction.channel.id
-<<<<<<< Updated upstream
-
-@bot.tree.command(name="setrollrole", description="Sets role for permissions to open/close roll windows.")
-async def setrollrole(interaction: discord.Interaction, id: int):
-    global roleID
-    roleID = id
-
-# Run the bot
-=======
     await interaction.response.send_message("Channel Set")
     
 @bot.tree.command(name="setrole", description="Set the role allowed to use open/close window + add/remove extra rolls.")
@@ -267,7 +258,6 @@ async def createlisting(interaction: discord.Interaction, item: str, trait: str)
     )
     
 # Run the bot.
->>>>>>> Stashed changes
 
 with open("API-Key.txt", "r", encoding='utf-8-sig') as f:
     apiKey = f.read()
