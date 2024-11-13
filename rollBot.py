@@ -98,7 +98,7 @@ async def rollwindowopen(interaction: discord.Interaction, item: str):
         userRollCount = {}
         await interaction.response.send_message(f"@here You may begin rolling for: `{item}`")
 
-@bot.tree.command(name="rollwindowclose", description="Stop all rolling.")
+@bot.tree.command(name="rollwindowclose", description="Stop all rolling.", )
 async def rollwindowclose(interaction: discord.Interaction):
     if not await validChannel(interaction) or not await validRole(interaction):
         return
@@ -256,7 +256,16 @@ async def createlisting(interaction: discord.Interaction, item: str, trait: str)
     name = f"{item} - {trait}",
     auto_archive_duration = 1440
     )
-    
+
+@bot.tree.command(name="mydkp", description="Check how much DKP you have.")
+async def mydkp(interaction: discord.Interaction):
+    if not await validChannel(interaction):
+        return
+   
+    user = findUser(interaction.user.id)
+    channel = await interaction.user.create_dm()
+
+    await channel.send(f"You have {user.dkp} DKP")
 # Run the bot.
 
 with open("API-Key.txt", "r", encoding='utf-8-sig') as f:
