@@ -98,7 +98,7 @@ async def rollwindowopen(interaction: discord.Interaction, item: str):
         userRollCount = {}
         await interaction.response.send_message(f"@here You may begin rolling for: `{item}`")
 
-@bot.tree.command(name="rollwindowclose", description="Stop all rolling.", )
+@bot.tree.command(name="rollwindowclose", description="Stop all rolling.")
 async def rollwindowclose(interaction: discord.Interaction):
     if not await validChannel(interaction) or not await validRole(interaction):
         return
@@ -127,7 +127,7 @@ async def roll(interaction: discord.Interaction):
 
         user = findUser(interID)
         if user != None:
-            user.updateUser(user.id, interNick, interName, user.extraRolls)
+            user.updateUser(user.id, interNick, interName, user.extraRolls, user.dkp)
 
         if interID not in userRollCount:
             userRollCount[interID] = 1
