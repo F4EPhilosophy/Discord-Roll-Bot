@@ -1,6 +1,9 @@
 import discord
 from discord.ext import commands
 import random
+import configparser
+import os 
+
 
 def findUser(id):
     global users
@@ -42,6 +45,36 @@ def readUserFile():
         with open("extraRolls.txt", "w", encoding='utf-8-sig') as f:
             f.close()
 
+def create_config():
+    config = configparser.ConfigParser()
+    if not os.path.exists('config.ini'):
+        config['General'] = {'Role_ID': 0, 'Roll_Channel': 0}
+
+        with open('config.ini', 'x') as configfile:
+            config.write(configfile)
+        return config
+    else:
+        config.read('config.ini')
+        rollChannelID = config.getint('General', 'Roll_Channel')
+        roleID = config.getint('General', 'Role_ID')
+    return roleID, rollChannelID
+
+if __name__ == "__main__":
+    create_config()
+
+def setRoll():
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    var = config.getint('General', 'roll_channel')
+    return var
+
+def setPerms():
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    var = config.getint('General', 'role_id')
+    return var
+
+
 class User:
     id = -1
     nickName = ""
@@ -70,12 +103,11 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
 users = []
-
 bot.rollWindow = False
 bot.rollWindowResults = []
 userRollCount = {}
-rollChannelID = 1298885178562711624; # To prevent rolling in other channels.
-roleID = 1300336466660167710 # Limit who can start/stop rolling sessions
+rollChannelID = setRoll() # To prevent rolling in other channels.
+roleID = setPerms() # Limit who can start/stop rolling sessions
 
 readUserFile()
 
@@ -237,6 +269,13 @@ async def setchannel(interaction: discord.Interaction):
         return
     global rollChannelID
     rollChannelID = interaction.channel.id
+
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    config.set('General', 'Roll_Channel', str(rollChannelID))
+    with open('config.ini', 'w') as configfile:
+        config.write(configfile)
+
     await interaction.response.send_message("Channel Set")
     
 @bot.tree.command(name="setrole", description="Set the role allowed to use open/close window + add/remove extra rolls.")
@@ -244,6 +283,13 @@ async def setchannel(interaction: discord.Interaction):
 async def setrole(interaction: discord.Interaction, id: str):
     global roleID
     roleID = int(id)
+
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    config.set('General', 'Role_ID', str(roleID))
+    with open('config.ini', 'w') as configfile:
+        config.write(configfile)
+
     await interaction.response.send_message("Role Set")
 
 @bot.tree.command(name="createlisting", description="Creates a thread for item listing.")
