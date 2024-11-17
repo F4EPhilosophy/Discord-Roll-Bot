@@ -4,7 +4,6 @@ import random
 import configparser
 import os 
 
-
 def findUser(id):
     global users
     for user in users:
@@ -312,6 +311,30 @@ async def mydkp(interaction: discord.Interaction):
     channel = await interaction.user.create_dm()
 
     await channel.send(f"You have {user.dkp} DKP")
+
+@bot.tree.command(name="dkpsearch", description="search specific users dkp.")
+async def dkpsearch(interaction: discord.Interaction, member: discord.Member):
+    if not await validChannel(interaction) or not await validRole(interaction):
+        return
+    
+    channel = await interaction.user.create_dm()
+    user = findUser(member.id)
+    
+    await channel.send(f"{member.name} has {0 if user == None else user.dkp} dkp")
+
+@bot.tree.command(name="dkptable", description="Print table of DKP")
+async def tabledkp(interaction: discord.Interaction, rows: int):
+    if not await validChannel(interaction) or not await validRole(interaction):
+        return
+    
+    channel = await interaction.user.create_dm()
+    sortedUsers = sorted(users, key=lambda x: x.dkp, reverse=True)
+
+    if len(sortedUsers) == 0:
+        response = "Nobody has any extra rolls."
+    else:
+        response = "\n".join([f"`Name: {user.nickName}, DKP: {user.dkp}`" for user in sortedUsers[0:rows]])
+    await channel.send(f"{response}")
 # Run the bot.
 
 with open("API-Key.txt", "r", encoding='utf-8-sig') as f:
