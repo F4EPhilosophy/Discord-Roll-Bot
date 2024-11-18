@@ -1,261 +1,172 @@
 import discord
 from discord.ext import commands
+from discord.ext import tasks
 import random
-import configparser
-import os 
+import time
 
-def findUser(id):
-    global users
-    for user in users:
-        if user.id == id:
-            return user
-    return None
-
-async def validChannel(interaction: discord.Interaction):
-    global rollChannelID
-    if interaction.channel.id != rollChannelID:
-        await interaction.response.send_message("You can not use that command in this channel")
-        return False
-    return True
-
-async def validRole(interaction: discord.Interaction):
-    if not any(role.id == roleID for role in interaction.user.roles):
-        await interaction.response.send_message(f"{interaction.user.mention} you do not have permission to use this command")
-        return False
-    return True
-
-def saveUserFile():
-    global users
-    with open("extraRolls.txt", "w", encoding='utf-8-sig') as f:
-        for user in users:
-            f.write(user.formatForFile())
-        f.close()
-
-def readUserFile():
-    global users
-    users = []
-    try:
-        with open("extraRolls.txt", "r", encoding='utf-8-sig') as f:
-            for line in f:
-                vals = line.split(',')
-                users.append(User(int(vals[0]), vals[1], vals[2], int(vals[3]), int(vals[4])))
-            f.close()
-    except:
-        with open("extraRolls.txt", "w", encoding='utf-8-sig') as f:
-            f.close()
-
-def create_config():
-    config = configparser.ConfigParser()
-    if not os.path.exists('config.ini'):
-        config['General'] = {'Role_ID': 0, 'Roll_Channel': 0}
-
-        with open('config.ini', 'x') as configfile:
-            config.write(configfile)
-        return config
-    else:
-        config.read('config.ini')
-        rollChannelID = config.getint('General', 'Roll_Channel')
-        roleID = config.getint('General', 'Role_ID')
-    return roleID, rollChannelID
-
-if __name__ == "__main__":
-    create_config()
-
-def setRoll():
-    config = configparser.ConfigParser()
-    config.read('config.ini')
-    var = config.getint('General', 'roll_channel')
-    return var
-
-def setPerms():
-    config = configparser.ConfigParser()
-    config.read('config.ini')
-    var = config.getint('General', 'role_id')
-    return var
-
-
-class User:
-    id = -1
-    nickName = ""
-    discordName = ""
-    extraRolls = 0
-    dkp = 0
-
-    def __init__(self, id, nickName, discordName, extraRolls, dkp):
-        self.updateUser(id, nickName, discordName, extraRolls, dkp)
-
-    def formatForFile(self):
-        string = str(self.id) + "," + self.nickName + "," + self.discordName + "," + str(self.extraRolls) + "," + str(self.dkp) + "\n"
-        return string
-    
-    def updateUser(self, id, nickName, discordName, extraRolls, dkp):
-        self.id = id
-        self.nickName = nickName if nickName != None else discordName
-        self.discordName = discordName
-        self.extraRolls = extraRolls
-        self.dkp = dkp
-
+from User import User
+from Event import Event
+from Server import Server
 
 # Enable Intents
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-users = []
-bot.rollWindow = False
-bot.rollWindowResults = []
-userRollCount = {}
-rollChannelID = setRoll() # To prevent rolling in other channels.
-roleID = setPerms() # Limit who can start/stop rolling sessions
-
-readUserFile()
+server = Server()
 
 @bot.event
 async def on_ready():
     await bot.tree.sync()
+    eventCheck.start()
     print(f"Bot is ready. Logged in as {bot.user}")
 
 @bot.tree.command(name="rollwindowopen", description="Time to roll!")
 async def rollwindowopen(interaction: discord.Interaction, item: str):
-    global userRollCount
-    if not await validChannel(interaction) or not await validRole(interaction):
+    global server
+    if not await server.validChannel(interaction) or not await server.validRole(interaction):
         return
 
-    if bot.rollWindow == True:
+    if server.rollWindow == True:
         await interaction.response.send_message("Rolling is already in progress")
     else:   
-        bot.rollWindow = True
-        bot.rollWindowResults = []
-        userRollCount = {}
+        server.rollWindow = True
+        server.rollWindowResults = []
+        server.userRollCount = {}
         await interaction.response.send_message(f"@here You may begin rolling for: `{item}`")
 
 @bot.tree.command(name="rollwindowclose", description="Stop all rolling.")
 async def rollwindowclose(interaction: discord.Interaction):
-    if not await validChannel(interaction) or not await validRole(interaction):
+    global server
+    if not await server.validChannel(interaction) or not await server.validRole(interaction):
         return
     
-    if bot.rollWindow == False:
+    if server.rollWindow == False:
         await interaction.response.send_message("Rolling is already closed")
-    elif not bot.rollWindowResults:   
+    elif not server.rollWindowResults:   
         await interaction.response.send_message("Roll window closed - No rolls logged")
     else:   
-        bot.rollWindow = False
-        sortedResult = sorted(bot.rollWindowResults, key=lambda x: x[1], reverse=True)
+        server.rollWindow = False
+        sortedResult = sorted(server.rollWindowResults, key=lambda x: x[1], reverse=True)
         await interaction.response.send_message("\n".join([f"`{name}: {number}`" for name, number in sortedResult]))
 
 @bot.tree.command(name="roll", description="Rolls a number between 1 and 100")
 async def roll(interaction: discord.Interaction):
-    if not await validChannel(interaction):
+    global server
+    if not await server.validChannel(interaction):
         return
 
     number = random.randint(1, 100)
     await interaction.response.send_message(f"🎲 You rolled a {number}! 🎲")
 
-    if bot.rollWindow == True:
+    if server.rollWindow == True:
         interName = interaction.user.name
         interNick = interaction.user.nick if interaction.user.nick != None else interName
         interID = interaction.user.id
 
-        user = findUser(interID)
+        user = server.findUser(interID)
         if user != None:
             user.updateUser(user.id, interNick, interName, user.extraRolls, user.dkp)
 
-        if interID not in userRollCount:
-            userRollCount[interID] = 1
-            bot.rollWindowResults.append((interNick, number))
+        if interID not in server.userRollCount:
+            server.userRollCount[interID] = 1
+            server.rollWindowResults.append((interNick, number))
         elif user == None or user.extraRolls == 0:
             await interaction.followup.send(f"{interaction.user.mention} you have no extra rolls avalible")
             await interaction.delete_original_response()
-        elif userRollCount[user.id] < 2 and user.extraRolls > 0:
-            userRollCount[user.id] += 1
+        elif server.userRollCount[user.id] < 2 and user.extraRolls > 0:
+            server.userRollCount[user.id] += 1
             user.extraRolls -= 1
-            bot.rollWindowResults.append((interNick, number))
+            server.rollWindowResults.append((interNick, number))
         else:   
             await interaction.followup.send(f"{interaction.user.mention} you have already rolled twice, your {number} will be ignored.")
             await interaction.delete_original_response()
 
-    saveUserFile()
+    server.saveUserFile()
 
 @bot.tree.command(name="addroll", description="Gives a user an extra roll to use later")
 async def addroll(interaction: discord.Interaction, member: discord.Member):
-    global users
-    if not await validChannel(interaction) or not await validRole(interaction):
+    global server
+    if not await server.validChannel(interaction) or not await server.validRole(interaction):
         return
     
-    user = findUser(member.id)
+    user = server.findUser(member.id)
     if user == None:
         user = User(member.id, member.nick, member.name, 0)
-        users.append(user)
+        server.users.append(user)
     
     user.extraRolls += 1
-    saveUserFile()
+    server.saveUserFile()
     await interaction.response.send_message(f"{user.nickName} has been given an extra roll.")
 
 @bot.tree.command(name="removeroll", description="Removes an extra roll from a user if they have one")
 async def removeroll(interaction: discord.Interaction, member: discord.Member):
-    global users
-    if not await validChannel(interaction) or not await validRole(interaction):
+    global server
+    if not await server.validChannel(interaction) or not await server.validRole(interaction):
         return
-    user = findUser(member.id)   
+    user = server.findUser(member.id)   
 
     if user == None or user.extraRolls == 0:
         await interaction.response.send_message(f"{member.name} has no extra rolls.")
     else:
         await interaction.response.send_message(f"{member.name} has had an extra roll taken away.")
         user.extraRolls -= 1
-    saveUserFile()
+    server.saveUserFile()
 
 @bot.tree.command(name="adddkp", description="Gives a user an extra roll to use later")
-async def dkpadd(interaction: discord.Interaction, member: discord.Member, ammount: int):
-    global users
-    if not await validChannel(interaction) or not await validRole(interaction):
+async def adddkp(interaction: discord.Interaction, member: discord.Member, amount: int):
+    global server
+    if not await server.validChannel(interaction) or not await server.validRole(interaction):
         return
     
-    user = findUser(member.id)
+    user = server.findUser(member.id)
     if user == None:
-        user = User(member.id, member.nick, member.name, 0, 0)
-        users.append(user)
+        user = User(member.id, member.nick, member.name, 0, amount)
+        server.users.append(user)
     else:
-        await interaction.response.send_message(f"{member.name} has had {ammount} DKP added.")
-        user.dkp += ammount
-    saveUserFile()
+        user.dkp += amount
+    await interaction.response.send_message(f"{member.name} has had {amount} DKP added.")
+    server.saveUserFile()
 
 @bot.tree.command(name="removedkp", description="Gives a user an extra roll to use later")
-async def dkpremove(interaction: discord.Interaction, member: discord.Member, ammount: int):
-
-    if not await validChannel(interaction) or not await validRole(interaction):
+async def removedkp(interaction: discord.Interaction, member: discord.Member, amount: int):
+    global server
+    if not await server.validChannel(interaction) or not await server.validRole(interaction):
         return
     
-    user = findUser(member.id)
+    user = server.findUser(member.id)
     if user == None:
-        user = User(member.id, member.nick, member.name, 0, 0)
-        users.append(user)
+        user = User(member.id, member.nick, member.name, 0, amount)
+        server.users.append(user)
     else:
-        await interaction.response.send_message(f"{member.name} has had {ammount} DKP removed.")
-        user.dkp -= ammount
-    saveUserFile()
+        user.dkp -= amount
+    await interaction.response.send_message(f"{member.name} has had {amount} DKP removed.")
+    server.saveUserFile()
 
 @bot.tree.command(name="extrarolls", description="How many extra rolls you have.")
 async def extrarolls(interaction: discord.Interaction):
-    if not await validChannel(interaction):
+    global server
+    if not await server.validChannel(interaction):
         return
     
-    user = findUser(interaction.user.id)
+    user = server.findUser(interaction.user.id)
     await interaction.response.send_message(f"You have {0 if user == None else user.extraRolls} extra roll(s)")
 
 @bot.tree.command(name="extrarollsearch", description="How many extra rolls someone else has.")
 async def extrarollsearch(interaction: discord.Interaction, member: discord.Member):
-    if not await validChannel(interaction) and not await validRole(interaction):
+    global server
+    if not await server.validChannel(interaction) and not await server.validRole(interaction):
         return
     
-    user = findUser(member.id)
+    user = server.findUser(member.id)
     await interaction.response.send_message(f"{member.name} has {0 if user == None else user.extraRolls} extra roll(s)")
 
 @bot.tree.command(name="extrarolltable", description="Table of users extra rolls. Users with none may not appear.")
 async def extrarolltable(interaction: discord.Interaction, rows: int):
-    if not await validChannel(interaction) and not await validRole(interaction):
+    global server
+    if not await server.validChannel(interaction) and not await server.validRole(interaction):
         return
-    sortedUsers = sorted(users, key=lambda x: x.extraRolls, reverse=True)
+    sortedUsers = sorted(server.users, key=lambda x: x.extraRolls, reverse=True)
     if len(sortedUsers) == 0:
         response = "Nobody has any extra rolls."
     else:
@@ -264,79 +175,162 @@ async def extrarolltable(interaction: discord.Interaction, rows: int):
 
 @bot.tree.command(name="setchannel", description="Designates a channel to use all commands in.")
 async def setchannel(interaction: discord.Interaction):
-    if not await validRole(interaction):
+    global server
+    if not await server.validRole(interaction):
         return
-    global rollChannelID
-    rollChannelID = interaction.channel.id
 
-    config = configparser.ConfigParser()
-    config.read('config.ini')
-    config.set('General', 'Roll_Channel', str(rollChannelID))
-    with open('config.ini', 'w') as configfile:
-        config.write(configfile)
+    server.rollChannelID = interaction.channel.id
+    server.saveConfig()
 
     await interaction.response.send_message("Channel Set")
     
 @bot.tree.command(name="setrole", description="Set the role allowed to use open/close window + add/remove extra rolls.")
 @commands.has_permissions(administrator=True)
 async def setrole(interaction: discord.Interaction, id: str):
-    global roleID
-    roleID = int(id)
-
-    config = configparser.ConfigParser()
-    config.read('config.ini')
-    config.set('General', 'Role_ID', str(roleID))
-    with open('config.ini', 'w') as configfile:
-        config.write(configfile)
-
+    global server
+    server.roleID = int(id)
+    server.saveConfig()
+    
     await interaction.response.send_message("Role Set")
 
 @bot.tree.command(name="createlisting", description="Creates a thread for item listing.")
 async def createlisting(interaction: discord.Interaction, item: str, trait: str):
-    if not await validChannel(interaction) or not await validRole(interaction):
+    global server
+    if not await server.validChannel(interaction) or not await server.validRole(interaction):
         return
     
     starter_message = await interaction.channel.send(f"Listing for **{item}** with **{trait}** has been created.")
-    thread = await starter_message.create_thread(
-    name = f"{item} - {trait}",
-    auto_archive_duration = 1440
-    )
+    await starter_message.create_thread(name = f"{item} - {trait}", auto_archive_duration = 1440)
 
 @bot.tree.command(name="mydkp", description="Check how much DKP you have.")
 async def mydkp(interaction: discord.Interaction):
-    if not await validChannel(interaction):
+    global server
+    if not await server.validChannel(interaction):
         return
    
-    user = findUser(interaction.user.id)
+    user = server.findUser(interaction.user.id)
     channel = await interaction.user.create_dm()
 
     await channel.send(f"You have {user.dkp} DKP")
 
 @bot.tree.command(name="dkpsearch", description="search specific users dkp.")
 async def dkpsearch(interaction: discord.Interaction, member: discord.Member):
-    if not await validChannel(interaction) or not await validRole(interaction):
+    global server
+    if not await server.validChannel(interaction) or not await server.validRole(interaction):
         return
     
     channel = await interaction.user.create_dm()
-    user = findUser(member.id)
+    user = server.findUser(member.id)
     
     await channel.send(f"{member.name} has {0 if user == None else user.dkp} dkp")
 
 @bot.tree.command(name="dkptable", description="Print table of DKP")
 async def tabledkp(interaction: discord.Interaction, rows: int):
-    if not await validChannel(interaction) or not await validRole(interaction):
+    global server
+    if not await server.validChannel(interaction) or not await server.validRole(interaction):
         return
     
     channel = await interaction.user.create_dm()
-    sortedUsers = sorted(users, key=lambda x: x.dkp, reverse=True)
+    sortedUsers = sorted(server.users, key=lambda x: x.dkp, reverse=True)
 
     if len(sortedUsers) == 0:
-        response = "Nobody has any extra rolls."
+        response = "No users in dkp list. Maybe no one has dkp?"
     else:
         response = "\n".join([f"`Name: {user.nickName}, DKP: {user.dkp}`" for user in sortedUsers[0:rows]])
     await channel.send(f"{response}")
-# Run the bot.
 
+@bot.tree.command(name="addevent", description="Gives a user an extra roll to use later")
+async def addevent(interaction: discord.Interaction, time: str, duration: int, name: str, dkp: int, recurring: bool):
+    global server
+    if not await server.validChannel(interaction) or not await server.validRole(interaction):
+        return
+
+    for event in server.events:
+        if event.time == time:
+            await interaction.response.send_message(f"There is already an event at that start time!")
+
+    newEvent = Event(time, duration, name, dkp, recurring)
+    if len(server.events) == 0:
+        server.events.append(newEvent)
+    else:
+        for idx, event in enumerate(server.events):
+            if newEvent.time < event.time:
+                server.events.insert(idx, newEvent)
+    await interaction.response.send_message(f"Event added!")
+    server.saveEventSchedule()
+
+@tasks.loop(seconds=30)
+async def eventCheck():
+    global server
+    guild = bot.get_guild(server.serverID)
+
+    currTime = time.strptime(time.ctime(time.time()))
+    currHour = currTime.tm_hour
+    currMinute = currTime.tm_min
+
+    if server.eventOpen:
+        event = server.currEvent
+        eventHour = int(event.time[0:2])
+        eventMinute = int(event.time[3:5])
+        if server.eventStarted:
+            if withinTimeRange(currHour, currMinute, eventHour, eventMinute, 60, event.duration):
+                server.eventEndAttendance = server.eventVoiceChannel.members.copy()
+                fullAttendance = []
+                partialAttendance = []
+                for memberEnd in server.eventEndAttendance:
+                    for memberStart in server.eventStartAttendance:
+                        if memberStart.id == memberEnd.id:
+                            fullAttendance.append(memberStart)
+                
+                for member in fullAttendance:
+                    user = server.findUser(member.id)
+                    if user == None:
+                        user = User(member.id, member.nick, member.name, 0, event.dkp)
+                        server.users.append(user)
+                    else:
+                        user.dkp += event.dkp
+                    break
+                server.saveUserFile()
+
+                #Display message of members who attended and got dkp, and list of member who showed up late or left early
+
+                await server.eventVoiceChannel.delete()
+                server.eventVoiceChannel = None
+                server.eventStartAttendance = []
+                server.eventEndAttendance = []
+                server.eventVoiceChannel = None
+                server.eventStarted = False
+                server.eventOpen = False
+        else:
+            if withinTimeRange(currHour, currMinute, eventHour, eventMinute, 5, 0):
+                server.eventStarted = True
+                server.eventStartAttendance = server.eventVoiceChannel.members.copy()
+    else:
+        for event in server.events:
+            eventHour = int(event.time[0:2])
+            eventMinute = int(event.time[3:5])
+            if withinTimeRange(currHour, currMinute, eventHour, eventMinute, 0, -5):
+                server.eventOpen = True
+                server.currEvent = event
+                server.eventVoiceChannel = await guild.create_voice_channel(name=server.currEvent.name)
+
+def withinTimeRange(currHour, currMinute, checkHour, checkMinute, topRange, bottomRange):
+    topRange = wrapTime(checkHour, checkMinute + topRange)
+    bottomRange = wrapTime(checkHour, checkMinute + bottomRange)
+    if bottomRange[0] < currHour or bottomRange[0] == currHour and bottomRange[1] <= currMinute:
+        if topRange[0] > currHour or topRange[0] == currHour and topRange[1] >= currMinute:
+            return True
+    return False
+
+def wrapTime(hour, minute):
+    if minute >= 60:
+        minute -= 60
+        hour += 1
+    elif minute < 0:
+        minute += 60
+        hour -= 1
+    return hour, minute
+        
 with open("API-Key.txt", "r", encoding='utf-8-sig') as f:
     apiKey = f.read()
     f.close()
