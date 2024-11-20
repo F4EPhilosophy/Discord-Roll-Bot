@@ -13,6 +13,7 @@ class Server:
     eventsFileName = "events.txt"
     roleID = -1
     rollChannelID = -1
+    dkpChannel = -1
     userRollCount = {}
     rollWindow = False
     rollWindowResults = []
@@ -61,22 +62,25 @@ class Server:
     def getConfig(self):
         config = configparser.ConfigParser()
         if not os.path.exists(self.configFileName):
-            config['General'] = {'Role_ID': 0, 'Roll_Channel': 0}
+            config['General'] = {'Role_ID': 0, 'Roll_Channel': 0, 'dkp_Channel': 0}
 
             with open(self.configFileName, 'x') as configfile:
                 config.write(configfile)
                 self.roleID = 0
                 self.rollChannelID = 0
+                self.dkpChannel = 0
         else:
             config.read(self.configFileName)
             self.rollChannelID = config.getint('General', 'Roll_Channel')
             self.roleID = config.getint('General', 'Role_ID')
+            self.dkpChannel = config.getint('General', 'dkp_Channel')
     
     def saveConfig(self):
         config = configparser.ConfigParser()
         config.read(self.configFileName)
         config.set('General', 'Roll_Channel', str(self.rollChannelID))
         config.set('General', 'Role_ID', str(self.roleID))
+        config.set('General', 'dkp_Channel', str(self.dkpChannel))
         with open('config.ini', 'w') as configfile:
             config.write(configfile)
 

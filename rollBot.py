@@ -46,9 +46,9 @@ async def rollwindowclose(interaction: discord.Interaction):
     elif not server.rollWindowResults:   
         await interaction.response.send_message("Roll window closed - No rolls logged")
     else:   
-        server.rollWindow = False
         sortedResult = sorted(server.rollWindowResults, key=lambda x: x[1], reverse=True)
         await interaction.response.send_message("\n".join([f"`{name}: {number}`" for name, number in sortedResult]))
+    server.rollWindow = False
 
 @bot.tree.command(name="roll", description="Rolls a number between 1 and 100")
 async def roll(interaction: discord.Interaction):
@@ -113,7 +113,7 @@ async def removeroll(interaction: discord.Interaction, member: discord.Member):
         user.extraRolls -= 1
     server.saveUserFile()
 
-@bot.tree.command(name="adddkp", description="Gives a user an extra roll to use later")
+@bot.tree.command(name="adddkp", description="Gives player dkp")
 async def adddkp(interaction: discord.Interaction, member: discord.Member, amount: int):
     global server
     if not await server.validChannel(interaction) or not await server.validRole(interaction):
@@ -128,7 +128,7 @@ async def adddkp(interaction: discord.Interaction, member: discord.Member, amoun
     await interaction.response.send_message(f"{member.name} has had {amount} DKP added.")
     server.saveUserFile()
 
-@bot.tree.command(name="removedkp", description="Gives a user an extra roll to use later")
+@bot.tree.command(name="removedkp", description="Removes player dkp")
 async def removedkp(interaction: discord.Interaction, member: discord.Member, amount: int):
     global server
     if not await server.validChannel(interaction) or not await server.validRole(interaction):
@@ -173,6 +173,15 @@ async def extrarolltable(interaction: discord.Interaction, rows: int):
         response = "\n".join([f"`Name: {user.nickName}, Extra rolls: {user.extraRolls}`" for user in sortedUsers[0:rows]])
     await interaction.response.send_message(f"{response}")
 
+@bot.tree.command(name="setrole", description="Set the role allowed to use admin commands.")
+@commands.has_permissions(administrator=True)
+async def setrole(interaction: discord.Interaction, id: str):
+    global server
+    server.roleID = int(id)
+    server.saveConfig()
+    
+    await interaction.response.send_message("Role Set")
+
 @bot.tree.command(name="setchannel", description="Designates a channel to use all commands in.")
 async def setchannel(interaction: discord.Interaction):
     global server
@@ -181,17 +190,17 @@ async def setchannel(interaction: discord.Interaction):
 
     server.rollChannelID = interaction.channel.id
     server.saveConfig()
+    #await interaction.response.send_message("Channel Set")
 
-    await interaction.response.send_message("Channel Set")
-    
-@bot.tree.command(name="setrole", description="Set the role allowed to use open/close window + add/remove extra rolls.")
-@commands.has_permissions(administrator=True)
-async def setrole(interaction: discord.Interaction, id: str):
+@bot.tree.command(name="setdkpchannel", description="Set the channel dkp related text will appear.")
+async def setdkpchannel(interaction: discord.Interaction):
     global server
-    server.roleID = int(id)
-    server.saveConfig()
+    if not await server.validRole(interaction):
+        return
     
-    await interaction.response.send_message("Role Set")
+    server.dkpChannel = interaction.channel.id
+    server.saveConfig()
+    await interaction.response.send_message("Channel Set")
 
 @bot.tree.command(name="createlisting", description="Creates a thread for item listing.")
 async def createlisting(interaction: discord.Interaction, item: str, trait: str):
@@ -202,11 +211,16 @@ async def createlisting(interaction: discord.Interaction, item: str, trait: str)
     starter_message = await interaction.channel.send(f"Listing for **{item}** with **{trait}** has been created.")
     await starter_message.create_thread(name = f"{item} - {trait}", auto_archive_duration = 1440)
 
+@bot.tree.command(name="maxdkp", description="set max dkp.")
+async def dkpsearch(interaction: discord.Interaction, max: int):
+    global server
+    if not await server.validChannel(interaction) or not await server.validRole(interaction):
+        return
+    server.maxdkp = max
+    await interaction.response.send_message(f"Max DKP has been set to {server.maxdkp}")
 @bot.tree.command(name="mydkp", description="Check how much DKP you have.")
 async def mydkp(interaction: discord.Interaction):
     global server
-    if not await server.validChannel(interaction):
-        return
    
     user = server.findUser(interaction.user.id)
     channel = await interaction.user.create_dm()
@@ -216,7 +230,7 @@ async def mydkp(interaction: discord.Interaction):
 @bot.tree.command(name="dkpsearch", description="search specific users dkp.")
 async def dkpsearch(interaction: discord.Interaction, member: discord.Member):
     global server
-    if not await server.validChannel(interaction) or not await server.validRole(interaction):
+    if not server.validRole(interaction):
         return
     
     channel = await interaction.user.create_dm()
@@ -227,7 +241,7 @@ async def dkpsearch(interaction: discord.Interaction, member: discord.Member):
 @bot.tree.command(name="dkptable", description="Print table of DKP")
 async def tabledkp(interaction: discord.Interaction, rows: int):
     global server
-    if not await server.validChannel(interaction) or not await server.validRole(interaction):
+    if not await server.validRole(interaction):
         return
     
     channel = await interaction.user.create_dm()
@@ -239,7 +253,7 @@ async def tabledkp(interaction: discord.Interaction, rows: int):
         response = "\n".join([f"`Name: {user.nickName}, DKP: {user.dkp}`" for user in sortedUsers[0:rows]])
     await channel.send(f"{response}")
 
-@bot.tree.command(name="addevent", description="Gives a user an extra roll to use later")
+@bot.tree.command(name="addevent", description="creates dkp event")
 async def addevent(interaction: discord.Interaction, time: str, duration: int, name: str, dkp: int, recurring: bool):
     global server
     if not await server.validChannel(interaction) or not await server.validRole(interaction):
@@ -263,7 +277,6 @@ async def addevent(interaction: discord.Interaction, time: str, duration: int, n
 async def eventCheck():
     global server
     guild = bot.get_guild(server.serverID)
-
     currTime = time.strptime(time.ctime(time.time()))
     currHour = currTime.tm_hour
     currMinute = currTime.tm_min
@@ -271,16 +284,19 @@ async def eventCheck():
     if server.eventOpen:
         event = server.currEvent
         eventHour = int(event.time[0:2])
-        eventMinute = int(event.time[3:5])
+        eventMinute = int(event.time[2:4])
         if server.eventStarted:
             if withinTimeRange(currHour, currMinute, eventHour, eventMinute, 60, event.duration):
                 server.eventEndAttendance = server.eventVoiceChannel.members.copy()
                 fullAttendance = []
                 partialAttendance = []
-                for memberEnd in server.eventEndAttendance:
-                    for memberStart in server.eventStartAttendance:
-                        if memberStart.id == memberEnd.id:
-                            fullAttendance.append(memberStart)
+
+                for memberStart in server.eventStartAttendance:
+                    if any(memberStart.id == memberEnd.id for memberEnd in server.eventEndAttendance):
+                        fullAttendance.append(memberStart)
+                else:
+                    partialAttendance.append(memberStart)
+                
                 
                 for member in fullAttendance:
                     user = server.findUser(member.id)
@@ -293,6 +309,12 @@ async def eventCheck():
                 server.saveUserFile()
 
                 #Display message of members who attended and got dkp, and list of member who showed up late or left early
+                channel = bot.get_channel(1308876024179720192)
+                fullResponse = "**Full Attendance list**:\n" + "\n".join([f"`{member.nick}`" for user in fullAttendance])
+                partialResponse = "**partial Attendance list**:\n" + "\n".join([f"`{member.nick}`" for user in fullAttendance])
+                await channel.send(f"{fullResponse}")
+                await channel.send(f"{partialResponse}")
+                
 
                 await server.eventVoiceChannel.delete()
                 server.eventVoiceChannel = None
@@ -305,14 +327,16 @@ async def eventCheck():
             if withinTimeRange(currHour, currMinute, eventHour, eventMinute, 5, 0):
                 server.eventStarted = True
                 server.eventStartAttendance = server.eventVoiceChannel.members.copy()
+                await server.eventVoiceChannel.send("attendance has started, leaving early will result in no dkp")
     else:
         for event in server.events:
             eventHour = int(event.time[0:2])
-            eventMinute = int(event.time[3:5])
+            eventMinute = int(event.time[2:4])
             if withinTimeRange(currHour, currMinute, eventHour, eventMinute, 0, -5):
                 server.eventOpen = True
                 server.currEvent = event
                 server.eventVoiceChannel = await guild.create_voice_channel(name=server.currEvent.name)
+                await server.eventVoiceChannel.send("Join for event. Event starts in 5 minutes")
 
 def withinTimeRange(currHour, currMinute, checkHour, checkMinute, topRange, bottomRange):
     topRange = wrapTime(checkHour, checkMinute + topRange)
