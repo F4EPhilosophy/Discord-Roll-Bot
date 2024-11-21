@@ -1,5 +1,5 @@
 class Event:
-    time = "00:00"
+    time = "0000"
     duration = 0
     name = ""
     dkp = 0

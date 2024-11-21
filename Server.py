@@ -3,6 +3,7 @@ import configparser
 import os
 import discord
 from Event import Event
+from helper import *
 
 class Server:
     serverID = 1298885178080497717
@@ -24,6 +25,7 @@ class Server:
     eventStartAttendance = []
     eventEndAttendance = []
     maxdkp = 0
+    mindkp = 0
 
     def __init__(self):
         self.getConfig()
@@ -38,7 +40,7 @@ class Server:
     
     def getUserFile(self):
         self.users = []
-        try:
+        if os.path.exists(self.rollsFileName):
             with open(self.rollsFileName, "r", encoding='utf-8-sig') as f:
                 for line in f:
                     vals = line.split(',')
@@ -49,12 +51,12 @@ class Server:
                     dkp = int(vals[4])
                     self.users.append(User(id, nickName, discordName, extraRolls, dkp))
                 f.close()
-        except:
+        else:
             with open(self.rollsFileName, "w", encoding='utf-8-sig') as f:
                 f.close()
 
-    def saveUserFile(self):
-        with open(self.rollsFileName, "w", encoding='utf-8-sig') as f:
+    def saveUserFile(self, filename=rollsFileName):
+        with open(filename, "w", encoding='utf-8-sig') as f:
             for user in self.users:
                 f.write(user.formatForFile())
             f.close()
@@ -92,7 +94,7 @@ class Server:
 
     def getEventSchedule(self):
         self.events = []
-        try:
+        if os.path.exists(self.eventsFileName):
             with open(self.eventsFileName, "r", encoding='utf-8-sig') as f:
                 for line in f:
                     vals = line.split(',')
@@ -103,10 +105,17 @@ class Server:
                     recurring = True if vals[4] == 'True' else False
                     self.events.append(Event(time, duration, name, dkp, recurring))
                 f.close()
-        except:
+        else:
             with open(self.eventsFileName, "w", encoding='utf-8-sig') as f:
                 f.close()
 
+    def giveDKP(self, member, dkp_amount):
+        user = self.findUser(member.id)
+        if user == None:
+            user = User(member.id, member.nick, member.name, 0, 0)
+            self.users.append(user)
+        user.dkp = user.dkp = clamp(user.dkp + dkp_amount, self.mindkp, self.maxdkp)
+        
     async def validChannel(self, interaction: discord.Interaction):
         if interaction.channel.id != self.rollChannelID:
             await interaction.response.send_message("You can not use that command in this channel")
