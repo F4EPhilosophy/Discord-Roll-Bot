@@ -25,6 +25,22 @@ async def on_ready():
     eventCheck.start()
     print(f"Bot is ready. Logged in as {bot.user}")
 
+@bot.tree.command(name="setmaxrolls", description="Set max # of rolls per open window")
+async def setmaxrolls(interaction: discord.Interaction, max_roll_count: int):
+    if not await bot.server.validChannel(interaction) or not await bot.server.validRole(interaction):
+        return
+        
+    if max_roll_count < 1:
+        await interaction.response.send_message("You can not set a number lower than 1")
+        return
+    if max_roll_count == bot.server.maxRolls:
+        await interaction.response.send_message(f"The current # of rolls is already set to {max_roll_count}")
+        return
+    else:
+        bot.server.maxRolls = max_roll_count
+        await interaction.response.send_message(f"Max # of rolls = {max_roll_count}")
+    bot.server.saveConfig()
+
 @bot.tree.command(name="setrole", description="Set the role allowed to use admin commands.")
 @commands.has_permissions(administrator=True)
 async def setrole(interaction: discord.Interaction, id: str):

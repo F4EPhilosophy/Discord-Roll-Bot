@@ -65,18 +65,20 @@ class Server:
     def getConfig(self):
         config = configparser.ConfigParser()
         if not os.path.exists(self.configFileName):
-            config['General'] = {'Role_ID': 0, 'Roll_Channel': 0, 'dkp_Channel': 0}
+            config['General'] = {'Role_ID': 0, 'Roll_Channel': 0, 'dkp_Channel': 0, 'Max_Rolls': 1}
 
             with open(self.configFileName, 'x') as configfile:
                 config.write(configfile)
                 self.roleID = 0
                 self.rollChannelID = 0
                 self.dkpChannel = 0
+                self.maxRolls = 1
         else:
             config.read(self.configFileName)
             self.rollChannelID = config.getint('General', 'Roll_Channel')
             self.roleID = config.getint('General', 'Role_ID')
             self.dkpChannel = config.getint('General', 'dkp_Channel')
+            self.maxRolls = config.getint('General', 'Max_Rolls')
     
     def saveConfig(self):
         config = configparser.ConfigParser()
@@ -84,6 +86,7 @@ class Server:
         config.set('General', 'Roll_Channel', str(self.rollChannelID))
         config.set('General', 'Role_ID', str(self.roleID))
         config.set('General', 'dkp_Channel', str(self.dkpChannel))
+        config.set('General', 'Max_Rolls', str(self.maxRolls))
         with open('config.ini', 'w') as configfile:
             config.write(configfile)
 
