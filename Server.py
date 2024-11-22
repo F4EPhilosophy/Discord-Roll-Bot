@@ -26,6 +26,7 @@ class Server:
     eventEndAttendance = []
     maxdkp = 0
     mindkp = 0
+    maxRolls = 1
 
     def __init__(self):
         self.getConfig()

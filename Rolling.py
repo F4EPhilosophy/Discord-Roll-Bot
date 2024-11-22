@@ -11,8 +11,20 @@ class Rolling(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="rollwindowopen", description="Time to roll!")
-    async def rollwindowopen(self, interaction: discord.Interaction, item: str):
+    @app_commands.command(name="setmaxroll", description="Set max # of rolls per open window")
+    async def setmaxroll(self, interaction: discord.Interaction, max_roll_count: int):
+        server = self.bot.server
+        if not await server.validChannel(interaction) or not await server.validRole(interaction):
+            return    
+        
+        if max_roll_count < 1:
+            await interaction.response.send_message("You can not set a number lower than 1")
+            return
+        else:
+            server.maxRolls = max_roll_count
+
+    @app_commands.command(name="rollwindowopen", description="allows users to roll on items")
+    async def rollwindowopen(self, interaction: discord.Interaction, item: str, trait: str):
         server = self.bot.server
         if not await server.validChannel(interaction) or not await server.validRole(interaction):
             return
@@ -23,9 +35,9 @@ class Rolling(commands.Cog):
             server.rollWindow = True
             server.rollWindowResults = []
             server.userRollCount = {}
-            await interaction.response.send_message(f"@here You may begin rolling for: `{item}`")
+            await interaction.response.send_message(f"@here You may begin rolling for: `{item} - {trait}` ")
 
-    @app_commands.command(name="rollwindowclose", description="Stop all rolling.")
+    @app_commands.command(name="rollwindowclose", description="Stop all rolling. List winner")
     async def rollwindowclose(self, interaction: discord.Interaction):
         server = self.bot.server
         if not await server.validChannel(interaction) or not await server.validRole(interaction):
@@ -53,6 +65,7 @@ class Rolling(commands.Cog):
             interName = interaction.user.name
             interNick = interaction.user.nick if interaction.user.nick != None else interName
             interID = interaction.user.id
+            maxRolls = server.maxRolls
 
             user = server.findUser(interID)
             if user != None:
@@ -64,12 +77,12 @@ class Rolling(commands.Cog):
             elif user == None or user.extraRolls == 0:
                 await interaction.followup.send(f"{interaction.user.mention} you have no extra rolls avalible")
                 await interaction.delete_original_response()
-            elif server.userRollCount[user.id] < 2 and user.extraRolls > 0:
+            elif server.userRollCount[user.id] < server.maxRolls and user.extraRolls > 0:
                 server.userRollCount[user.id] += 1
                 user.extraRolls -= 1
                 server.rollWindowResults.append((interNick, number))
             else:   
-                await interaction.followup.send(f"{interaction.user.mention} you have already rolled twice, your {number} will be ignored.")
+                await interaction.followup.send(f"{interaction.user.mention} you have already rolled {maxRolls} times(s), your {number} will be ignored.")
                 await interaction.delete_original_response()
 
         server.saveUserFile()
